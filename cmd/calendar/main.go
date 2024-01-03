@@ -1,8 +1,17 @@
 package main
 
 import (
+	"context"
 	"flag"
-	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/ybgr111/ne/internal/app"
+	"github.com/ybgr111/ne/internal/logger"
+	internalhttp "github.com/ybgr111/ne/internal/server/http"
+	memorystorage "github.com/ybgr111/ne/internal/storage/memory"
 )
 
 var configFile string
@@ -19,8 +28,34 @@ func main() {
 		return
 	}
 
-	// config := NewConfig()
-	// logg := logger.New(config.Logger.Level)
+	config := NewConfig()
+	logg := logger.New(config.Logger.Level)
 
-	fmt.Println("hellow golang")
+	storage := memorystorage.New()
+	calendar := app.New(logg, storage)
+
+	server := internalhttp.NewServer(logg, calendar)
+
+	ctx, cancel := signal.NotifyContext(context.Background(),
+		syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+	defer cancel()
+
+	go func() {
+		<-ctx.Done()
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+		defer cancel()
+
+		if err := server.Stop(ctx); err != nil {
+			logg.Error("failed to stop http server: " + err.Error())
+		}
+	}()
+
+	logg.Info("calendar is running...")
+
+	if err := server.Start(ctx); err != nil {
+		logg.Error("failed to start http server: " + err.Error())
+		cancel()
+		os.Exit(1) //nolint:gocritic
+	}
 }
