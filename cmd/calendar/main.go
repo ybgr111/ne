@@ -19,8 +19,8 @@ func main() {
 		return
 	}
 
-	config := NewConfig()
-	logg := logger.New(config.Logger.Level)
+	// config := NewConfig()
+	// logg := logger.New(config.Logger.Level)
 
 	fmt.Println("hellow golang")
 }
